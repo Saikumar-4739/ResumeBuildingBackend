@@ -4,6 +4,10 @@ import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
 import { AddressModule } from './address/address.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ExperienceModule } from './experience/exp.module';
+import { AcademicModule } from './academics/aca.module';
+import { SkillModule } from './skills/skill.module';
+import { PersonalDetailsModule } from './pdetails/pdetails.module';
 
 @Module({
   imports: [
@@ -20,6 +24,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     }),
     UserModule,
     AddressModule,
+    ExperienceModule,
+    AcademicModule,
+    SkillModule,
+    PersonalDetailsModule
   ],
   controllers: [AppController],
   providers: [AppService],

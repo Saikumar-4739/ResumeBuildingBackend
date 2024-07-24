@@ -5,4 +5,5 @@ export class AddressModel {
     country: string;
     zipcode: number;
     addressId?: number;
+    userid?: number;
 }

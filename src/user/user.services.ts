@@ -29,7 +29,7 @@ export class UserService {
         errorCode: 2,
       };
     }
-
+  
     const existingUser = await this.userEntity.findOne({
       where: { email: userData.email },
     });
@@ -41,13 +41,13 @@ export class UserService {
         errorCode: 4,
       };
     }
-
+  
     const newUser = this.userEntity.create({
       name: userData.uname,
       email: userData.email,
       mobile: userData.mobileNo,
     });
-
+  
     try {
       await this.addressService.createAddress(userData.address[0]);
     } catch (error) {
@@ -57,11 +57,10 @@ export class UserService {
         data: null,
         errorCode: 3,
       };
-      // eslint-disable-next-line prettier/prettier
-        }
-
+    }
+  
     const savedUser = await this.userEntity.save(newUser);
-
+  
     const userModel: UserModel = {
       userId: savedUser.userId,
       uname: savedUser.name,
@@ -69,8 +68,12 @@ export class UserService {
       mobileNo: savedUser.mobile,
       createdate: savedUser.createdate,
       address: userData.address[0],
+      experience: null, 
+      academics: null, 
+      skills: null, 
+      personaldetails: null, 
     };
-
+  
     return {
       status: true,
       internalMessage: 'User saved successfully',
@@ -220,7 +223,7 @@ export class UserService {
     const userToUpdate = await this.userEntity.findOne({
       where: { userId: req.userId },
     });
-
+  
     if (!userToUpdate) {
       return {
         status: false,
@@ -229,18 +232,18 @@ export class UserService {
         errorCode: 1,
       };
     }
-
+  
     userToUpdate.name = req.uname;
     userToUpdate.email = req.email;
     userToUpdate.mobile = req.mobileNo;
-
+  
     // Ensure req.address exists and is not empty
     if (req.address && req.address.length > 0) {
       await this.addressService.updateAddress(req.address[0]);
     }
-
+  
     const updatedUser = await this.userEntity.save(userToUpdate);
-
+  
     const userModel: UserModel = {
       userId: updatedUser.userId,
       uname: updatedUser.name,
@@ -248,8 +251,12 @@ export class UserService {
       mobileNo: updatedUser.mobile,
       createdate: updatedUser.createdate,
       address: req.address && req.address.length > 0 ? req.address[0] : null, // Ensure address is taken from req
+      experience: updatedUser.experience, 
+      academics: updatedUser.academics, 
+      skills: updatedUser.skills, 
+      personaldetails: updatedUser.personaldetails,
     };
-
+  
     return {
       status: true,
       internalMessage: 'User updated successfully',
