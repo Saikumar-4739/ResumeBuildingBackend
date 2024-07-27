@@ -4,10 +4,12 @@ import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
 import { AddressModule } from './address/address.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ExperienceModule } from './experience/exp.module';
-import { AcademicModule } from './academics/aca.module';
-import { SkillModule } from './skills/skill.module';
-import { PersonalDetailsModule } from './pdetails/pdetails.module';
+import { ExperienceModule } from './experience/experience.module';
+import { AcademicModule } from './academics/academics.module';
+import { SkillModule } from './skills/skills.module';
+import { PersonalDetailsModule } from './personal-details/personal-details.module';
+import { DeclarationModule } from './declaration/declaration.module';
+
 
 @Module({
   imports: [
@@ -27,7 +29,8 @@ import { PersonalDetailsModule } from './pdetails/pdetails.module';
     ExperienceModule,
     AcademicModule,
     SkillModule,
-    PersonalDetailsModule
+    PersonalDetailsModule,
+    DeclarationModule
   ],
   controllers: [AppController],
   providers: [AppService],

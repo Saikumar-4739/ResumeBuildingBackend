@@ -1,30 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import { addressIdRequest } from './addressid.request';
-import { AddressModel } from '../user/models/address.model';
-import { AddressResponse } from './address.response';
-import { AddressRepo } from './address.repo';
+import { addressIdRequest } from './models/address.id-request';
+import { AddressModel } from './models/address.model';
+import { AddressRepo } from './models/address.repo';
+import { AddressResponse } from './models/address.response';
+import AddressEntities from './address.entities';
+
+
 
 @Injectable()
 export class AddressService {
   constructor(private readonly addressRepository: AddressRepo) {}
 
   async createAddress(addressModel: AddressModel): Promise<AddressResponse> {
-    const newAddress = this.addressRepository.create(addressModel);
-    const savedAddress = await this.addressRepository.save(newAddress);
 
-    const address: AddressModel = {
-      street: savedAddress.street,
-      city: savedAddress.city,
-      state: savedAddress.state,
-      country: savedAddress.country,
-      zipcode: savedAddress.zipcode,
-      addressId: savedAddress.addressId,
-    };
+    const addressEnt = new AddressEntities();
+    addressEnt.userId = addressModel.userid;
+    addressEnt.street = addressModel.street;
+    addressEnt.city = addressModel.city;
+    addressEnt.country = addressModel.country;
+    addressEnt.zipcode = addressModel.zipcode;
+
+    const savedAddress = await this.addressRepository.save(addressEnt);
 
     return {
       status: true,
       internalMessage: 'Address saved successfully',
-      data: [address],
+      data: [savedAddress],
       errorCode: 0,
     };
   }

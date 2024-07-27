@@ -1,11 +1,11 @@
-import { AddressModel} from "./address.model";
+import { AddressModel} from "../../address/models/address.model";
 
 export class UserCreateRequest {
     uname: string;
     email: string;
-    mobileNo: string;
+    mobileNo: number;
     address: AddressModel[];
     userId?: number; 
-    createDate: any;
+    createDate: string;
  
 }

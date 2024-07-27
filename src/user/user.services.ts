@@ -1,27 +1,32 @@
 import { Injectable } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './user.entities';
 import { UserCreateRequest } from './models/user-create.request';
 import { UserIdRequest } from './models/userid.request';
 import { UserModel } from './models/user.model';
 import { UserResponse } from './models/user.response';
-import { AddressModel } from './models/address.model';
+import { AddressModel } from '../address/models/address.model';
 import { AddressService } from '../address/address.services';
+import {UserRepo} from './userrepo/user.repo'
+import { UserDetailedInfoQueryResponse } from './models/ueer-detailed-info.query.response';
+import ExperienceModel from 'src/experience/models/exp.model';
+import { UserDetailedInfoResponse } from './models/user-detailed-info.response';
+import AcademicModel from 'src/academics/models/academics.model';
+import SkillModel from 'src/skills/models/skills.model';
+import PersonalDetailsModel from 'src/personal-details/models/personal-details.model';
+import UserEntity from './user.entities';
+import UserDetailedInfoModel from './models/user-detailed-info.model';
+import DeclarationModel from 'src/declaration/models/declaration.model';
+
 
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User) private userEntity: Repository<User>,
+    private UserRepo: UserRepo,
     private addressService: AddressService
   ) {}
 
   async createUser(userData: UserCreateRequest): Promise<UserResponse> {
-    if (
-      !userData.address ||
-      !Array.isArray(userData.address) ||
-      userData.address.length === 0
-    ) {
+    // Validate address
+    if (!userData.address || !Array.isArray(userData.address) || userData.address.length === 0) {
       return {
         status: false,
         internalMessage: 'Address is missing or invalid',
@@ -30,9 +35,8 @@ export class UserService {
       };
     }
   
-    const existingUser = await this.userEntity.findOne({
-      where: { email: userData.email },
-    });
+    // Check if user already exists
+    const existingUser = await this.UserRepo.findOne({ where: { email: userData.email } });
     if (existingUser) {
       return {
         status: false,
@@ -42,14 +46,27 @@ export class UserService {
       };
     }
   
-    const newUser = this.userEntity.create({
-      name: userData.uname,
-      email: userData.email,
-      mobile: userData.mobileNo,
-    });
+    let savedUser: UserEntity;
+    try {
+      const userEnt = new UserEntity();
+      userEnt.email = userData.email;
+      userEnt.name = userData.uname;
+      userEnt.mobile = userData.mobileNo;
+      savedUser = await this.UserRepo.save(userEnt);
+    } catch (error) {
+      return {
+        status: false,
+        internalMessage: 'Failed to save user',
+        data: null,
+        errorCode: 5,
+      };
+    }
   
     try {
-      await this.addressService.createAddress(userData.address[0]);
+      for (const address of userData.address) {
+        address.userid = savedUser.userId;
+        await this.addressService.createAddress(address);
+      }
     } catch (error) {
       return {
         status: false,
@@ -59,95 +76,20 @@ export class UserService {
       };
     }
   
-    const savedUser = await this.userEntity.save(newUser);
-  
-    const userModel: UserModel = {
-      userId: savedUser.userId,
-      uname: savedUser.name,
-      email: savedUser.email,
-      mobileNo: savedUser.mobile,
-      createdate: savedUser.createdate,
-      address: userData.address[0],
-      experience: null, 
-      academics: null, 
-      skills: null, 
-      personaldetails: null, 
-    };
-  
+    // Return successful response
     return {
       status: true,
-      internalMessage: 'User saved successfully',
-      data: [userModel],
-      errorCode: 0,
+        internalMessage: 'User created successfully',
+        data: [],
+        errorCode: null,
     };
   }
-
-  async getUsersByUserIds(req: UserIdRequest): Promise<UserResponse> {
-    try {
-      const userIds = req.userId;
-
-      // Fetch users by IDs
-      const users = await this.userEntity.findByIds(userIds);
-
-      if (!Array.isArray(users) || users.length === 0) {
-        return {
-          status: false,
-          internalMessage: 'No users found for the provided IDs',
-          data: [],
-          errorCode: 1,
-        };
-      }
-
-      const userModels: UserModel[] = [];
-      for (const user of users) {
-        // Fetch the address for each user
-        const address = await this.addressService.getAddressOfUserId(
-          user.userId
-        );
-        if (!address) {
-          continue; // Skip this user if address not found
-        }
-        const addressModel = new AddressModel();
-        addressModel.addressId = address.addressId;
-        addressModel.city = address.city;
-        addressModel.country = address.country;
-        addressModel.street = address.street;
-        addressModel.zipcode = address.zipcode;
-
-        // Populate the UserModel
-        const userModel = new UserModel();
-        userModel.userId = user.userId;
-        userModel.uname = user.name;
-        userModel.email = user.email;
-        userModel.mobileNo = user.mobile;
-        userModel.createdate = user.createdate;
-        userModel.address = addressModel;
-
-        userModels.push(userModel);
-      }
-
-      return {
-        status: true,
-        internalMessage: 'Users retrieved successfully',
-        data: userModels,
-        errorCode: 0,
-      };
-    } catch (error) {
-      // Log the error for debugging
-      console.error('Error fetching users:', error);
-      return {
-        status: false,
-        internalMessage: 'An error occurred while retrieving users',
-        data: [],
-        errorCode: 500,
-      };
-    }
-  }
-
+  
+  
   async deleteUsersByUserIds(req: UserIdRequest): Promise<UserResponse> {
     const userIds = req.userId;
 
-    if (!Array.isArray(userIds) || userIds.length === 0) {
+    if (!Array.isArray(userIds) || !userIds.length) {
       return {
         status: false,
         internalMessage: 'No user IDs provided or invalid format',
@@ -157,7 +99,13 @@ export class UserService {
     }
 
     try {
-      await this.userEntity.delete(userIds);
+      await this.UserRepo.delete(userIds);
+      return {
+        status: true,
+        internalMessage: 'Users deleted successfully',
+        data: null,
+        errorCode: 0,
+      };
     } catch (error) {
       return {
         status: false,
@@ -166,102 +114,167 @@ export class UserService {
         errorCode: 2,
       };
     }
-
-    return {
-      status: true,
-      internalMessage: 'Users deleted successfully',
-      data: null,
-      errorCode: 0,
-    };
   }
 
-  async getAllUsers(): Promise<UserResponse> {
+
+  async updateUser(req: UserCreateRequest): Promise<UserResponse> {
     try {
-      const users = await this.userEntity.find();
+        // Ensure mobileNo is a number
+        const mobileNo = Number(req.mobileNo);
+        if (isNaN(mobileNo)) {
+            return {
+                status: false,
+                internalMessage: 'Invalid mobile number format',
+                data: [],
+                errorCode: 4, // New error code for invalid mobile number
+            };
+        }
 
-      const userModels: UserModel[] = await Promise.all(
-        users.map(async (user) => {
-          // Write a query to address table and get the address
-          const address = await this.addressService.getAddressOfUserId(
-            user.userId
-          );
-          const addressModel = new AddressModel();
-          addressModel.addressId = address.addressId;
-          addressModel.city = address.city;
-          addressModel.country = address.country;
-          addressModel.street = address.street;
-          addressModel.zipcode = address.zipcode;
+        const userToUpdate = await this.UserRepo.findOne({ where: { userId: req.userId } });
 
-          const userInfo = new UserModel();
-          userInfo.userId = user.userId;
-          userInfo.email = user.email;
-          userInfo.mobileNo = user.mobile;
-          userInfo.createdate = user.createdate;
-          userInfo.address = addressModel;
+        if (!userToUpdate) {
+            return {
+                status: false,
+                internalMessage: 'User not found',
+                data: [],
+                errorCode: 1,
+            };
+        }
 
-          return userInfo;
-        })
-      );
+        // Update user details
+        userToUpdate.name = req.uname;
+        userToUpdate.email = req.email;
+        userToUpdate.mobile = mobileNo;
 
+        // Update address if provided
+        if (req.address && req.address.length > 0) {
+            try {
+                await this.addressService.updateAddress(req.address[0]);
+            } catch (error) {
+                return {
+                    status: false,
+                    internalMessage: 'Failed to update address',
+                    data: [],
+                    errorCode: 3,
+                };
+            }
+        }
+
+        // Save updated user
+        const updatedUser = await this.UserRepo.save(userToUpdate);
+
+        // Ensure createdate is a date
+        const createdate = new Date(updatedUser.createdate);
+
+        const userModel: UserModel = {
+            userId: updatedUser.userId,
+            uname: updatedUser.name,
+            email: updatedUser.email,
+            mobileNo: updatedUser.mobile,
+            createdate: createdate, 
+            address: req.address && req.address.length > 0 ? req.address[0] : null
+        };
+
+        return {
+            status: true,
+            internalMessage: 'User updated successfully',
+            data: [userModel],
+            errorCode: 0,
+        };
+    } catch (error) {
+        return {
+            status: false,
+            internalMessage: 'Failed to update user',
+            data: [],
+            errorCode: 2,
+        };
+    }
+  }
+
+
+  async getUsersByUserIds(req: { userId: number[] }): Promise<UserDetailedInfoResponse> {
+    try {
+      const userIds = req.userId;
+      const users: UserDetailedInfoQueryResponse[] = await this.UserRepo.getUsers();
+
+      const userDetailedModels: UserDetailedInfoModel[] = [];
+      for(const user of users) {
+        const userDetailedModel = new UserDetailedInfoModel();
+        userDetailedModel.userId = 0;
+        userDetailedModel.name = user.name;
+        userDetailedModel.email = user.email;
+        userDetailedModel.mobile = user.mobile;
+        userDetailedModel.createdate = user.createdate;
+
+
+        const addr = new AddressModel();
+        addr.street = user.street;
+        addr.city = user.city;
+        addr.state = user.state;
+        addr.country = user.country;
+        addr.zipcode = user.zipcode;
+        userDetailedModel.address = addr;
+
+        const expe = new ExperienceModel();
+        expe.objective = user.objective;
+        expe.companyName = user.companyName;
+        expe.role = user.role;
+        expe.fromYear = user.fromYear;
+        expe.toYear = user.toYear;
+        expe.description = user.description;
+        userDetailedModel.experience = expe;
+
+        const acade = new AcademicModel();
+        acade.institutionName = user.institutionName;
+        acade.passingYear = user.passingYear;
+        acade.qualification = user.qualification;
+        acade.university = user.university;
+        acade.percentage = user.percentage;
+        userDetailedModel.academic = acade;
+
+        const skill = new SkillModel();
+        skill.skillName = user.skillName;
+        skill.department = user.department;
+        userDetailedModel.skills = skill;
+
+        const pdetails = new PersonalDetailsModel();
+        pdetails.fatherName = user.fatherName;
+        pdetails.motherName = user.motherName;
+        pdetails.dateOfBirth = user.dateOfBirth;
+        pdetails.maritalStatus = user.maritalStatus;
+        pdetails.languagesKnown = user.languagesKnown;
+        userDetailedModel.personalDetails = pdetails;
+
+        const declare = new DeclarationModel();
+        declare.place = user.place;
+        declare.date = user.date;
+        userDetailedModel.declaration = declare;
+
+        userDetailedModels.push(userDetailedModel);
+      }
+      if (users.length === 0) {
+        return {
+          status: false,
+          internalMessage: 'No users found for the provided IDs',
+          data: [],
+          errorCode: 404,
+        };
+      }    
       return {
         status: true,
         internalMessage: 'Users retrieved successfully',
-        data: userModels,
+        data: userDetailedModels,
         errorCode: 0,
       };
     } catch (error) {
-      return {
-        status: false,
-        internalMessage: 'Failed to retrieve users',
-        data: [],
-        errorCode: 1,
-      };
-    }
-  }
 
-  async updateUser(req: UserCreateRequest): Promise<UserResponse> {
-    const userToUpdate = await this.userEntity.findOne({
-      where: { userId: req.userId },
-    });
-  
-    if (!userToUpdate) {
+      console.error('Error fetching users:', error);
       return {
         status: false,
-        internalMessage: 'User not found',
+        internalMessage: 'An error occurred while retrieving users',
         data: [],
-        errorCode: 1,
+        errorCode: 500,
       };
     }
-  
-    userToUpdate.name = req.uname;
-    userToUpdate.email = req.email;
-    userToUpdate.mobile = req.mobileNo;
-  
-    // Ensure req.address exists and is not empty
-    if (req.address && req.address.length > 0) {
-      await this.addressService.updateAddress(req.address[0]);
-    }
-  
-    const updatedUser = await this.userEntity.save(userToUpdate);
-  
-    const userModel: UserModel = {
-      userId: updatedUser.userId,
-      uname: updatedUser.name,
-      email: updatedUser.email,
-      mobileNo: updatedUser.mobile,
-      createdate: updatedUser.createdate,
-      address: req.address && req.address.length > 0 ? req.address[0] : null, // Ensure address is taken from req
-      experience: updatedUser.experience, 
-      academics: updatedUser.academics, 
-      skills: updatedUser.skills, 
-      personaldetails: updatedUser.personaldetails,
-    };
-  
-    return {
-      status: true,
-      internalMessage: 'User updated successfully',
-      data: [userModel],
-      errorCode: 0,
-    };
   }
 }

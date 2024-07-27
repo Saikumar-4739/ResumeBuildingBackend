@@ -3,6 +3,7 @@ import { UserService } from './user.services';
 import { UserCreateRequest } from './models/user-create.request';
 import { UserIdRequest } from './models/userid.request';
 import { UserResponse } from './models/user.response';
+import { UserDetailedInfoResponse } from './models/user-detailed-info.response';
 
 @Controller('users')
 export class UserController {
@@ -14,7 +15,7 @@ export class UserController {
   }
 
   @Post('/getUsersByUserIds')
-  async getUsersByUserIds(@Body() req: UserIdRequest): Promise<UserResponse> {
+  async getUsersByUserIds(@Body() req:  { userId: number[] }): Promise<UserDetailedInfoResponse> {
     return this.userService.getUsersByUserIds(req);
   }
 
@@ -23,11 +24,6 @@ export class UserController {
     @Body() req: UserIdRequest
   ): Promise<UserResponse> {
     return this.userService.deleteUsersByUserIds(req);
-  }
-
-  @Get('/getAllUsers')
-  async getAllUsers(): Promise<UserResponse> {
-    return this.userService.getAllUsers();
   }
 
   @Post('/updateUser')
